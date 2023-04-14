@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Ray Marching Example</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            background-color: #2a2938;
+        }
+
+        canvas {
+            width: 96vh;
+            height: 96vh;
+            border: 2px solid #df9943;
+        }
+    </style>
+
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+    <script type="x-shader/x-vertex" id="vertexShader">
+        precision mediump float;
+        attribute vec3 a_position;
+        void main() {
+          gl_Position = vec4(a_position, 1.0);
+        }
+    </script>
+    <script type="x-shader/x-fragment" id="fragmentShader">
+        precision mediump float;
+        
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        uniform vec3 u_sphereColor;
+        uniform vec3 u_cubeColor;
+        uniform vec3 u_obstacleColor;
+        uniform float u_y;
+        uniform float u_xObstacle;
+
+        vec3 lightPosition = vec3(-4.0, 6.0, 10.0);
+        vec3 lightColor = vec3(1, 0.8509, 0.2392);
+        float lightIntensity = 50.0;
+        float lightAttenuation = 0.3;
+
+        vec3 backgroundColor = vec3(0.8509, 0.7451, 0.5059);
+
+        mat2 rotate(float a) {
+            float s = sin(a);
+            float c = cos(a);
+
+            return mat2(c, -s, s, c);
+        }
+
+        float sphereSDF(vec3 p, vec3 c, float r) {
+            return length(p - c) - r;
+        }
+
+        float cubeSDF(vec3 p, vec3 pCube, vec3 len) {
+            vec3 d = abs(vec3(p.x - pCube.x, p.y - pCube.y, p.z - pCube.z)) - len;
+            float insideDistance = min(max(d.x, max(d.y, d.z)), 0.0);
+            float outsideDistance = length(max(d, 0.0));
+            
+            return insideDistance + outsideDistance;
+        }        
+
+        float smoothMax(float a, float b, float k) {
+            return log(exp(k * a) + exp(k * b)) / k;
+        }
+        
+        float smoothMin(float a, float b, float k) {
+            return -smoothMax(-a, -b, k);
+        }
+                
+        vec4 scene(vec3 p) {
+            float distances[4];
+            vec3 colors[4];
+            distances[0] = cubeSDF(p, vec3(0.0, -1.0, 0.0), vec3(1.0, 1.0, 0.5));
+            distances[1] = cubeSDF(p, vec3(3.0, -3.0, 0.0), vec3(10.0, 1.0, 10.0));
+            distances[2] = cubeSDF(p, vec3(0.0, 0.0, -10.0), vec3(10.0, 10.0, 6.0));
+            distances[3] = sphereSDF(p, vec3(5.0, u_y, 2.0), 0.7);
+
+            colors[0] = u_cubeColor;
+            colors[1] = u_sphereColor;
+            colors[2] = backgroundColor;
+            colors[3] = u_cubeColor;
+
+            float d1 = distances[0];
+            vec3 color = colors[0];
+            float distance = distances[0];
+            
+            for(int i = 1; i < 4; i++) {
+                float d2 = distances[i];
+                float mix_factor = d1 / (d2 + d1);
+                color = mix(
+                    color,
+                    colors[i],
+                    mix_factor
+                );
+                d1 = mix_factor;
+                distance = smoothMin(distance, d2, 12.0);
+            }
+
+            return vec4(color, distance); 
+        }
+
+        vec3 estimateNormal(vec3 p) {
+            float eps = 0.001;
+            float dx = scene(vec3(p.x + eps, p.y, p.z)).w - scene(vec3(p.x - eps, p.y, p.z)).w;
+            float dy = scene(vec3(p.x, p.y + eps, p.z)).w - scene(vec3(p.x, p.y - eps, p.z)).w;
+            float dz = scene(vec3(p.x, p.y, p.z + eps)).w - scene(vec3(p.x, p.y, p.z - eps)).w;
+            return normalize(vec3(dx, dy, dz));
+        }
+        
+        float calculateLight(vec3 pointPos, vec3 pointNormal) {
+            // Calcula a direção da luz em relação ao ponto
+            vec3 lightDirection = normalize(lightPosition - pointPos);
+          
+            // Calcula o produto escalar entre a direção da luz e a normal do ponto
+            float diff = max(dot(pointNormal, lightDirection), 0.0);
+          
+            // Calcula a atenuação da luz em função da distância
+            float distance = length(lightPosition - pointPos);
+            float attenuation = 1.0 / (1.0 + lightAttenuation * distance * distance);
+            
+
+            /////////////////////////////////////////não ta funcionado
+            /*
+            vec3 specularColor = vec3(1.0);
+            float shininess = 32.0;
+            vec3 V = normalize(vec3(0.5, 0.5, 1) - pointPos); // direction to camera
+            vec3 L = normalize(lightPosition - pointPos); // direction to light
+            vec3 R = reflect(-L, pointNormal); // reflection direction
+            float specularAmount = pow(max(dot(R, V), 0.0), shininess);
+            vec3 specular = lightColor * specularColor * specularAmount;
+            */
+            /////////////////////////////////////////
+
+
+            // Retorna a quantidade de luz que atinge o ponto
+            return lightIntensity * attenuation * diff;
+        }
+
+        float calculateShadow(vec3 pointPos) {
+            // Calcula a direção do raio
+            vec3 shadowDirection = normalize(lightPosition - pointPos);
+            float distanceLength = length(pointPos - lightPosition);
+            float radius = 0.1;
+
+            // fraction of light visible, starts at one radius (second half added in the end);
+	        float lf = radius * distanceLength;
+	
+            // distance traveled
+            float dt = 0.01;
+
+            for (int i = 0; i < 100; i++) {
+                vec3 currentPos = pointPos + shadowDirection * dt;
+                float currentDistance = scene(currentPos).w;
+                if (currentDistance < -radius) {
+                    return 0.0;
+                    break;
+                }
+                
+                lf = min(lf, currentDistance / dt);
+                dt += currentDistance;
+
+                if (dt > distanceLength) {
+                    break;
+                }
+            }
+
+            lf = clamp((lf*distanceLength + radius) / (2.0 * radius), 0.0, 1.0);
+	        lf = smoothstep(0.0, 1.0, lf);
+        
+            return lf;
+        }
+
+        vec3 raymarch(vec3 ro, vec3 rd) {
+            float t = 0.0;
+            float d = 0.0;  //distance
+            vec4 sc;
+            vec3 color;
+            float lightAmount;
+            float shadow = 1.0;
+            
+            for (int i = 0; i < 100; i++) {
+                vec3 p = ro + rd * t;
+                sc = scene(p);
+                d = sc.w;
+                color = sc.xyz;
+                
+                t += d;
+                if (d < 0.001 || t > 100.0) {
+                    vec3 normal = estimateNormal(p);
+                    lightAmount = calculateLight(p, normal);
+                    shadow = calculateShadow(p);
+                    break;
+                }
+            }
+            
+            return color * lightAmount * lightColor * shadow;
+        }
+
+        void main() {
+            vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+            //ray origin
+            vec3 ro = vec3(3.0, 1.0, 10.0);
+            //ray direction
+            vec3 rd = normalize(vec3(uv.x - 0.5, uv.y -0.5, -1));
+            vec3 color = raymarch(ro, rd);
+            gl_FragColor = vec4(color, 1.0);
+        }
+    </script>
+    <script src="index.js"></script>
+</body>
+
+</html>
