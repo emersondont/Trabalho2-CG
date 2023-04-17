@@ -12,6 +12,7 @@ const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 gl.shaderSource(fragmentShader, fragmentShaderSource);
 gl.compileShader(fragmentShader);
 
+
 const devicePixelRatio = window.devicePixelRatio || 1;
 canvas.width = canvas.clientWidth * devicePixelRatio;
 canvas.height = canvas.clientHeight * devicePixelRatio;
@@ -41,6 +42,9 @@ const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution')
 gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
 
 
+//daqui p baixo
+
+
 const sphereColor = gl.getUniformLocation(program, 'u_sphereColor');
 const cubeColor = gl.getUniformLocation(program, 'u_cubeColor');
 const obstacleColor = gl.getUniformLocation(program, 'u_obstacleColor');
@@ -64,7 +68,7 @@ const random = gl.getUniformLocation(program, 'u_random');
 var time = 0
 var time_jump = 0
 var x = 8.0;
-var vel = 0.2
+var vel = 0.02
 
 document.addEventListener("keydown", function (event) {
     if (event.key === ' ') { // Tecla espaço
@@ -78,7 +82,7 @@ function render() {
     time += 0.01;
     time_jump += 0.015;
 
-    let y = -10.0 * fract(time_jump*2) * (fract(time_jump*2) - 1.0);
+    let y = -10.0 * fract(time_jump * 2) * (fract(time_jump * 2) - 1.0);
     if (jumping) {
         gl.uniform1f(u_y, y);
     }
@@ -86,12 +90,12 @@ function render() {
         jumping = false
     }
 
-    
+
     //vel += vel/1000
 
     x -= vel
 
-    if(x <= -5.0)
+    if (x <= -5.0)
         x = 8.0
 
     gl.uniform1f(xObstacle, x);

@@ -40,10 +40,10 @@
         uniform float u_y;
         uniform float u_xObstacle;
 
-        vec3 lightPosition = vec3(-4.0, 6.0, 10.0);
+        vec3 lightPosition = vec3(1.0, 5.0, 10.0);
         vec3 lightColor = vec3(1, 0.8509, 0.2392);
         float lightIntensity = 50.0;
-        float lightAttenuation = 0.3;
+        float lightAttenuation = 0.25;
 
         vec3 backgroundColor = vec3(0.8509, 0.7451, 0.5059);
 
@@ -73,19 +73,39 @@
         float smoothMin(float a, float b, float k) {
             return -smoothMax(-a, -b, k);
         }
+
+        vec3 sphereRotate(vec3 position, float vel, vec3 refPosition) {
+            float angle = u_time / vel;
+
+            vec3 rotatedPosition = vec3(
+                position.x * cos(angle) + position.z * sin(angle),
+                position.y,
+                -position.x * sin(angle) + position.z * cos(angle)
+            );
+
+            vec3 finalPosition = vec3(
+                rotatedPosition.x * cos(0.0) - rotatedPosition.y * sin(0.0),
+                rotatedPosition.x * sin(0.0) + rotatedPosition.y * cos(0.0),
+                rotatedPosition.z
+            ) + refPosition;
+
+            return finalPosition;
+        }
                 
         vec4 scene(vec3 p) {
             float distances[4];
             vec3 colors[4];
-            distances[0] = cubeSDF(p, vec3(0.0, -1.0, 0.0), vec3(1.0, 1.0, 0.5));
+            vec3 bp = p;
+            bp.xz *= rotate(u_time);
+            distances[0] = cubeSDF(vec3(bp.x, p.y, bp.z), vec3(0.0, -1.0, 0.0), vec3(1.0, 1.0, 0.5));
             distances[1] = cubeSDF(p, vec3(3.0, -3.0, 0.0), vec3(10.0, 1.0, 10.0));
             distances[2] = cubeSDF(p, vec3(0.0, 0.0, -10.0), vec3(10.0, 10.0, 6.0));
-            distances[3] = sphereSDF(p, vec3(5.0, u_y, 2.0), 0.7);
+            distances[3] = sphereSDF(p, vec3(u_xObstacle, u_y-0.5, 0.0), 0.7);
 
             colors[0] = u_cubeColor;
             colors[1] = u_sphereColor;
             colors[2] = backgroundColor;
-            colors[3] = u_cubeColor;
+            colors[3] = vec3(0.0, 0.5, 1.0);
 
             float d1 = distances[0];
             vec3 color = colors[0];
@@ -100,7 +120,7 @@
                     mix_factor
                 );
                 d1 = mix_factor;
-                distance = smoothMin(distance, d2, 12.0);
+                distance = smoothMin(distance, d2, 6.0);
             }
 
             return vec4(color, distance); 
@@ -125,22 +145,13 @@
             float distance = length(lightPosition - pointPos);
             float attenuation = 1.0 / (1.0 + lightAttenuation * distance * distance);
             
-
-            /////////////////////////////////////////não ta funcionado
-            /*
-            vec3 specularColor = vec3(1.0);
-            float shininess = 32.0;
-            vec3 V = normalize(vec3(0.5, 0.5, 1) - pointPos); // direction to camera
-            vec3 L = normalize(lightPosition - pointPos); // direction to light
-            vec3 R = reflect(-L, pointNormal); // reflection direction
-            float specularAmount = pow(max(dot(R, V), 0.0), shininess);
-            vec3 specular = lightColor * specularColor * specularAmount;
-            */
-            /////////////////////////////////////////
-
+            //calcula a intencidade da specular
+            vec3 reflectedDirection = reflect(-lightDirection, pointNormal);
+            float cosAngle = max(dot(reflectedDirection, pointNormal), 0.5);
+            float specularIntensity = pow(cosAngle, 50.0);
 
             // Retorna a quantidade de luz que atinge o ponto
-            return lightIntensity * attenuation * diff;
+            return lightIntensity * attenuation * (diff + specularIntensity);
         }
 
         float calculateShadow(vec3 pointPos) {
@@ -177,17 +188,40 @@
             return lf;
         }
 
+        vec3 calculateReflection(vec3 pointPos, vec3 pointNormal, vec3 objColor) {
+            // Calcula a direção da luz em relação ao ponto
+            vec3 lightDirection = normalize(lightPosition - pointPos);
+            
+            //vec3 dirOut = lightDirection - 2.0 * dot(lightDirection, pointNormal) * pointNormal;
+            vec3 reflectionVector = reflect(lightDirection, pointNormal);
+            float dt = 0.01;
+
+            for (int i = 0; i < 100; i++) {
+                vec3 currentPos = pointPos + reflectionVector * dt;
+                vec4 sc = scene(currentPos);
+                float currentDistance = sc.w;
+                if (currentDistance < 0.001 || dt > 100.0) {
+                    return sc.xyz;
+                    break;
+                }
+                
+                dt += currentDistance;
+            }
+
+            return vec3(0.0);
+        }
+
         vec3 raymarch(vec3 ro, vec3 rd) {
             float t = 0.0;
             float d = 0.0;  //distance
-            vec4 sc;
             vec3 color;
+            vec3 reflection;
             float lightAmount;
             float shadow = 1.0;
             
             for (int i = 0; i < 100; i++) {
                 vec3 p = ro + rd * t;
-                sc = scene(p);
+                vec4 sc = scene(p);
                 d = sc.w;
                 color = sc.xyz;
                 
@@ -195,12 +229,13 @@
                 if (d < 0.001 || t > 100.0) {
                     vec3 normal = estimateNormal(p);
                     lightAmount = calculateLight(p, normal);
+                    reflection = calculateReflection(p, normal, color);
                     shadow = calculateShadow(p);
                     break;
                 }
             }
             
-            return color * lightAmount * lightColor * shadow;
+            return mix(color,reflection, 0.1) * lightAmount * lightColor * shadow;
         }
 
         void main() {
