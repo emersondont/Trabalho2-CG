@@ -8,6 +8,8 @@
         body {
             display: flex;
             justify-content: center;
+            align-items: center;
+            gap: 10%;
             background-color: #292837;
             /*cursor: none;*/
         }
@@ -17,12 +19,94 @@
             height: 96vh;
             border: 2px solid #22202c;
         }
+        .item {
+            display: flex;
+            flex-direction: row;
+            gap: 24px;
+            align-items: center;
+            justify-content: space-between;
+            color: #fff;
+            font-weight: 500;
+            font-size: 20px;
+        }
+        .item p {
+            margin-bottom: 5%;
+        }
+
+        .wasd {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: 900;
+            font-size: 24px;
+        }
+        .wasd p {
+            margin: 0;
+        }
+
+        .inputs {
+            display: flex;
+            flex-direction: column;
+        }
+        .inputs div {
+            display: flex;
+            flex-direction: row;
+            gap: 16px;
+        }
+
+        .inputs p {
+            font-weight: 500;
+            font-size: 20px;
+            color: #fff;
+        }
+
+        .inputs input {
+            width: 100px;
+        }
     </style>
 
 </head>
 
 <body>
+    <div class="buttons">
+        <div class="item">
+            <div class="wasd">
+                <p>W</p>
+                <p>A S D</p>
+            </div>
+            <p>Move</p>
+        </div>
+
+        <div class="item">
+            <p style="font-weight: 900; font-size: 24px;">Shift</p>
+            <p>Up</p>
+        </div>
+        
+        <div class="item">
+            <p style="font-weight: 900; font-size: 24px;">Control</p>
+            <p>Down</p>
+        </div>
+
+        <div class="item">
+            <p style="font-weight: 900; font-size: 24px;">Space</p>
+            <p>Pause</p>
+        </div>
+    </div>
+
     <canvas id="canvas"></canvas>
+
+    <div class="inputs">
+        <div>
+            <input type="range" min="1.5" max="6.0" step="0.05" id="inputsmooth">
+            <p>Smooth</p>
+        </div>
+        <div>
+            <input type="range" min="0.1" max="1.0" step="0.01" id="inputvel">
+            <p>Speed</p>
+        </div>
+    </div>
+
     <script type="x-shader/x-vertex" id="vertexShader">
         precision mediump float;
         attribute vec3 a_position;
@@ -35,6 +119,8 @@
         
         uniform vec2 u_resolution;
         uniform float u_time;
+        uniform float u_xCam;
+        uniform float u_yCam;
         uniform float u_zCam;
         uniform float u_k;
 
@@ -94,9 +180,9 @@
         }
                 
         vec4 scene(vec3 p) {
-            const int len = 12;
+            const int len = 20;
             vec3 bp = p;
-            bp.xy *= rotate(u_time/100.0);
+            bp.xy *= rotate(u_time/10.0);
 
             float d1 = max(
                 cubeSDF(vec3(bp.x, bp.y, bp.z), vec3(0.0, 0.0, -1.0), vec3(5.0, 5.0, 5.0)),
@@ -108,11 +194,13 @@
             for(int i = 0; i < len; i++) {
                 float fi = float(i);
 		        float time = u_time * (fract(fi * 412.531 + 0.513) - 0.5) * 2.0;
+
                 float d2 = sphereSDF(
                     p + sin(time + fi * vec3(52.5126, 64.62744, 632.25)) * vec3(2.0, 2.0, 0.8), 
                     vec3(0.0),
                     mix(0.5, 1.0, fract(fi * 412.531 + 0.5124))
                 );
+
                 vec3 colorAux = vec3(0.0, 0.0, float(i)/float(len));
   
                 float mix_factor = d1 / (d2 + d1);
@@ -224,13 +312,14 @@
             vec2 uv = gl_FragCoord.xy / u_resolution.xy;
             vec3 pointToLookAt = vec3(0.5, 0.5, 1.0);
             //ray origin
-            vec3 ro = vec3(0.0, 0.0, u_zCam);
+            vec3 ro = vec3(u_xCam, u_yCam, u_zCam);
             //ray direction
             vec3 rd = normalize(vec3(uv, 0.0) - pointToLookAt);
             vec3 color = raymarch(ro, rd);
             gl_FragColor = vec4(color, 1.0);
         }
     </script>
+
     <script src="index.js"></script>
 </body>
 
