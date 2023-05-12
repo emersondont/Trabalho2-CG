@@ -124,10 +124,10 @@
         uniform float u_zCam;
         uniform float u_k;
 
-        vec3 lightPosition = vec3(0.0, 0.0, 4.0);
+        vec3 lightPosition = vec3(0.0, 0.0, 6.0);
         vec3 lightColor = vec3(1);
-        float lightIntensity = 16.0;
-        float lightAttenuation = 0.4;
+        float lightIntensity = 14.0;
+        float lightAttenuation = 0.6;
 
         mat2 rotate(float a) {
             float s = sin(a);
@@ -190,6 +190,28 @@
             );
             vec3 color = vec3(0.8, 0.0000, 0.0627);
             float distance = d1;
+
+            vec3 colors[len];
+            colors[0] = vec3(1.0000, 0.2353, 0.0000);
+            colors[1] = vec3(1.0000, 0.7333, 0.0000);
+            colors[2] = vec3(1.0000, 0.9176, 0.0000);
+            colors[3] = vec3(0.2980, 0.6824, 0.3098);
+            colors[4] = vec3(0.0118, 0.5961, 0.8863);
+            colors[5] = vec3(1.0000, 0.0000, 1.0000);
+            colors[6] = vec3(0.0000, 1.0000, 1.0000);
+            colors[7] = vec3(1.0000, 1.0000, 0.0000);
+            colors[8] = vec3(1.0000, 0.0000, 0.5020);
+            colors[9] = vec3(0.0000, 1.0000, 0.0000);
+            colors[10] = vec3(1.0000, 0.2353, 0.0000);
+            colors[11] = vec3(1.0000, 0.7333, 0.0000);
+            colors[12] = vec3(1.0000, 0.9176, 0.0000);
+            colors[13] = vec3(0.2980, 0.6824, 0.3098);
+            colors[14] = vec3(0.0118, 0.5961, 0.8863);
+            colors[15] = vec3(1.0000, 0.0000, 1.0000);
+            colors[16] = vec3(0.0000, 1.0000, 1.0000);
+            colors[17] = vec3(1.0000, 1.0000, 0.0000);
+            colors[18] = vec3(1.0000, 0.0000, 0.5020);
+            colors[19] = vec3(0.0000, 1.0000, 0.0000);
             
             for(int i = 0; i < len; i++) {
                 float fi = float(i);
@@ -201,15 +223,15 @@
                     mix(0.5, 1.0, fract(fi * 412.531 + 0.5124))
                 );
 
-                vec3 colorAux = vec3(0.0, 0.0, float(i)/float(len));
+                //vec3 colorAux = vec3(0.0, 0.0, float(i)/float(len));
   
                 float mix_factor = d1 / (d2 + d1);
                 color = mix(
                     color,
-                    colorAux,
+                    colors[i],
                     mix_factor
                 );
-                d1 = mix_factor;
+                d1 = distance;
                 distance = smoothMin(distance, d2, u_k);
             }
 
